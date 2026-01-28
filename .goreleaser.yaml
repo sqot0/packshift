@@ -1,0 +1,15 @@
+version: 2
+
+project_name: packshift
+
+builds:
+    - main: ./main.go
+      goos:
+          - windows
+      goarch:
+          - amd64
+          - arm64
+
+archives:
+    - formats: ["tar.gz"]
+      name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
