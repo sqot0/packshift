@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://i.imgur.com/cbSsyW9.png" alt="Packsmith - Smith modpack easy" />
+  <img src="https://i.imgur.com/sFOMABG.png" alt="Packshift - Deploy modpack easy" />
 </p>
 
 # Packshift
 
-Packshift is a simple command-line tool for uploading and deploying Minecraft modpacks (and other files) to remote FTP/SFTP servers. It is designed to be compatible with the Packsmith ecosystem — Packshift is a complementary CLI utility that helps you publish and sync modpack server files reliably.
+Packshift is a simple command-line tool for uploading and deploying Minecraft modpacks (and other files) to remote FTP/SFTP servers. It is designed to be compatible with the [Packsmith](https://github.com/sqot0/packsmith) ecosystem — Packshift is a complementary CLI utility that helps you publish and sync modpack server files reliably.
 
 Key capabilities:
 - Upload local directories/files to a remote FTP or SFTP server.
@@ -106,9 +106,7 @@ If you want to build Packshift yourself:
    - `git clone https://github.com/sqot0/packshift.git`
 3. Build:
    - `cd packshift`
-   - `go build -o packshift ./cmd`
-4. Optionally install:
-   - `go install ./cmd`
+   - `go build`
 
 This produces an executable named `packshift` (or `packshift.exe` on Windows).
 
