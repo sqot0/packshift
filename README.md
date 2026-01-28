@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://i.imgur.com/sFOMABG.png" alt="Packshift - Deploy modpack easy" />
+  <img src="https://i.imgur.com/ibuWXZi.png" alt="Packshift - Deploy modpack easy" />
 </p>
 
 # Packshift
