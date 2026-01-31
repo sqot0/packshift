@@ -21,75 +21,89 @@ type IFTPClient interface {
 func Run(cfg *config.Config) error {
 	log.Println("Running deploy")
 
-	var ftpClient IFTPClient
-
 	decryptedPassword, err := crypto.Decrypt(cfg.FTPConfig.Password)
 	if err != nil {
 		return err
 	}
 	cfg.FTPConfig.Password = decryptedPassword
 
-	if cfg.FTPConfig.SSL {
-		ftpClient = NewSFTPClient(&cfg.FTPConfig)
-	} else {
-		ftpClient = NewFTPClient(&cfg.FTPConfig)
-	}
-
-	if err := ftpClient.Connect(); err != nil {
-		return err
-	}
-	defer ftpClient.Disconnect()
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 8)
+	type job struct {
+		local  string
+		remote string
+	}
+
+	jobs := make(chan job)
 	errCh := make(chan error, 1)
 
-	for localPath, remotePath := range cfg.PathMappings {
-		absoluteLocalPath := filepath.Join(cwd, localPath)
+	workerCount := 4
 
-		err := filepath.WalkDir(absoluteLocalPath, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			var ftpClient IFTPClient
+			if cfg.FTPConfig.SSL {
+				ftpClient = NewSFTPClient(&cfg.FTPConfig)
+			} else {
+				ftpClient = NewFTPClient(&cfg.FTPConfig)
 			}
-			if d.IsDir() {
-				return nil
+
+			if err := ftpClient.Connect(); err != nil {
+				select {
+				case errCh <- err:
+				default:
+				}
+				return
 			}
+			defer ftpClient.Disconnect()
 
-			relativePath, err := filepath.Rel(absoluteLocalPath, path)
-			if err != nil {
-				return err
-			}
-			remoteFilePath := filepath.Join(remotePath, relativePath)
-			remoteFilePath = strings.ReplaceAll(remoteFilePath, "\\", "/")
-
-			wg.Add(1)
-			go func(local, remote string) {
-				defer wg.Done()
-
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				log.Printf("Uploading %s to %s\n", local, remote)
-				if err := ftpClient.UploadFile(local, remote); err != nil {
+			for j := range jobs {
+				log.Printf("Uploading %s -> %s\n", j.local, j.remote)
+				if err := ftpClient.UploadFile(j.local, j.remote); err != nil {
 					select {
 					case errCh <- err:
 					default:
 					}
+					return
 				}
-			}(path, remoteFilePath)
-
-			return nil
-		})
-
-		if err != nil {
-			return err
-		}
+			}
+		}()
 	}
+
+	go func() {
+		defer close(jobs)
+
+		for localPath, remotePath := range cfg.PathMappings {
+			absoluteLocalPath := filepath.Join(cwd, localPath)
+
+			filepath.WalkDir(absoluteLocalPath, func(path string, d fs.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return err
+				}
+
+				relativePath, err := filepath.Rel(absoluteLocalPath, path)
+				if err != nil {
+					return err
+				}
+
+				remoteFilePath := filepath.Join(remotePath, relativePath)
+				remoteFilePath = strings.ReplaceAll(remoteFilePath, "\\", "/")
+
+				jobs <- job{
+					local:  path,
+					remote: remoteFilePath,
+				}
+				return nil
+			})
+		}
+	}()
 
 	go func() {
 		wg.Wait()
